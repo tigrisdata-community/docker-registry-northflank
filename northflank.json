@@ -129,7 +129,7 @@
                     },
                     "type": "deployment",
                     "external": {
-                      "imagePath": "registry:2"
+                      "imagePath": "registry:3"
                     },
                     "metadata": {
                       "labels": {},
@@ -233,14 +233,14 @@
   "description": "Template generated for 'registry' project.",
   "options": {
     "autorun": false,
-    "concurrencyPolicy": "allow",
-    "runOnUpdate": false
+    "concurrencyPolicy": "allow"
   },
-  "argumentOverrides": {
-    "BUCKET_NAME": "<bucket_name>",
-    "ACCESS_KEY": "<access_key>",
-    "SECRET_KEY": "<secret_key>",
-    "CERT_FILE": "<cert_generated>",
-    "CERT_KEY": "<cert_key_generated"
-  }
+  "gitops": {
+    "repoUrl": "https://github.com/tigrisdata-community/docker-registry-northflank",
+    "vcsService": "github",
+    "accountLogin": "tigrisdata-community",
+    "branch": "main",
+    "filePath": "/northflank.json"
+  },
+  "$schema": "https://api.northflank.com/v1/schemas/template"
 }
