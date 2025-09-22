@@ -129,7 +129,7 @@
                     },
                     "type": "deployment",
                     "external": {
-                      "imagePath": "registry:3"
+                      "imagePath": "registry:2"
                     },
                     "metadata": {
                       "labels": {},
@@ -233,7 +233,8 @@
   "description": "Template generated for 'registry' project.",
   "options": {
     "autorun": false,
-    "concurrencyPolicy": "allow"
+    "concurrencyPolicy": "allow",
+    "runOnUpdate": false
   },
   "gitops": {
     "repoUrl": "https://github.com/tigrisdata-community/docker-registry-northflank",
