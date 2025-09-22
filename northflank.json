@@ -1,0 +1,246 @@
+{
+  "apiVersion": "v1.2",
+  "spec": {
+    "kind": "Workflow",
+    "spec": {
+      "type": "sequential",
+      "steps": [
+        {
+          "ref": "project",
+          "kind": "Project",
+          "spec": {
+            "name": "tigris-registry",
+            "color": "#57637A",
+            "networking": {
+              "tailscale": {
+                "authKeyTags": [],
+                "enabled": false
+              },
+              "allowedIngressProjects": [],
+              "hostAliases": {
+                "enabled": false
+              }
+            },
+            "region": "europe-west",
+            "description": ""
+          }
+        },
+        {
+          "kind": "Workflow",
+          "spec": {
+            "context": {
+              "projectId": "${refs.project.id}"
+            },
+            "type": "sequential",
+            "steps": [
+              {
+                "kind": "CombinedService",
+                "spec": {
+                  "deployment": {
+                    "instances": 1,
+                    "storage": {
+                      "ephemeralStorage": {
+                        "storageSize": 1024
+                      },
+                      "shmSize": 64
+                    },
+                    "docker": {
+                      "configType": "default"
+                    },
+                    "type": "deployment",
+                    "metadata": {
+                      "labels": {},
+                      "annotations": {}
+                    }
+                  },
+                  "loadBalancing": {
+                    "mode": "leastConnection"
+                  },
+                  "buildSettings": {
+                    "storage": {
+                      "ephemeralStorage": {
+                        "storageSize": 16384
+                      }
+                    },
+                    "dockerfile": {
+                      "buildEngine": "buildkit",
+                      "dockerFilePath": "/Dockerfile",
+                      "dockerWorkDir": "/"
+                    }
+                  },
+                  "name": "auth-endpoint",
+                  "infrastructure": {
+                    "architecture": "x86"
+                  },
+                  "billing": {
+                    "buildPlan": "nf-compute-400-16",
+                    "deploymentPlan": "nf-compute-10"
+                  },
+                  "ports": [
+                    {
+                      "name": "web",
+                      "internalPort": 5007,
+                      "protocol": "HTTP",
+                      "public": true,
+                      "security": {
+                        "securePathConfiguration": {
+                          "rules": []
+                        }
+                      }
+                    }
+                  ],
+                  "buildSource": "git",
+                  "disabledCI": false,
+                  "vcsData": {
+                    "projectUrl": "https://github.com/tigrisdata-community/self-hosted-docker-registry",
+                    "projectType": "github",
+                    "projectBranch": "main"
+                  },
+                  "runtimeEnvironment": {
+                    "BUCKET_NAME": "${args.BUCKET_NAME}",
+                    "CERT_FNAME": "/tmp/anu.pem",
+                    "KEY_FNAME": "/tmp/anu.key"
+                  },
+                  "runtimeFiles": {},
+                  "buildArguments": {},
+                  "buildFiles": {},
+                  "dockerSecretMounts": {},
+                  "buildConfiguration": {
+                    "pathIgnoreRules": [],
+                    "isAllowList": false,
+                    "ciIgnoreFlagsEnabled": false
+                  }
+                },
+                "ref": "auth-endpoint"
+              },
+              {
+                "kind": "DeploymentService",
+                "spec": {
+                  "deployment": {
+                    "instances": 1,
+                    "storage": {
+                      "ephemeralStorage": {
+                        "storageSize": 1024
+                      },
+                      "shmSize": 64
+                    },
+                    "docker": {
+                      "configType": "default"
+                    },
+                    "type": "deployment",
+                    "external": {
+                      "imagePath": "registry:2"
+                    },
+                    "metadata": {
+                      "labels": {},
+                      "annotations": {}
+                    }
+                  },
+                  "loadBalancing": {
+                    "mode": "leastConnection"
+                  },
+                  "name": "registry",
+                  "infrastructure": {
+                    "architecture": "x86"
+                  },
+                  "billing": {
+                    "deploymentPlan": "nf-compute-20"
+                  },
+                  "ports": [
+                    {
+                      "name": "http",
+                      "internalPort": 5000,
+                      "protocol": "HTTP",
+                      "public": true,
+                      "security": {
+                        "securePathConfiguration": {
+                          "rules": []
+                        }
+                      }
+                    }
+                  ],
+                  "runtimeEnvironment": {
+                    "REGISTRY_STORAGE": "s3",
+                    "REGISTRY_STORAGE_S3_REGION": "auto",
+                    "REGISTRY_STORAGE_S3_REGIONENDPOINT": "https://t3.storage.dev",
+                    "REGISTRY_STORAGE_S3_FORCEPATHSTYLE": "false",
+                    "REGISTRY_STORAGE_S3_ENCRYPT": "false",
+                    "REGISTRY_STORAGE_S3_SECURE": "true",
+                    "REGISTRY_STORAGE_S3_V4AUTH": "true",
+                    "REGISTRY_STORAGE_S3_CHUNKSIZE": "5242880",
+                    "REGISTRY_STORAGE_S3_ROOTDIRECTORY": "/",
+                    "REGISTRY_AUTH": "token",
+                    "REGISTRY_AUTH_TOKEN_ISSUER": "Tigris Anu",
+                    "REGISTRY_AUTH_TOKEN_REALM": "https://${refs.auth-endpoint.ports.0.dns}/auth",
+                    "REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE": "/tmp/anu.pem",
+                    "REGISTRY_AUTH_TOKEN_SERVICE": "Authentication",
+                    "REGISTRY_HTTP_DEBUG_ADDR": ":5001",
+                    "REGISTRY_HTTP_DEBUG_PROMETHEUS_ENABLED": "true",
+                    "REGISTRY_HTTP_DEBUG_PROMETHEUS_PATH": "/metrics"
+                  },
+                  "runtimeFiles": {}
+                },
+                "ref": "registry"
+              },
+              {
+                "kind": "Workflow",
+                "spec": {
+                  "type": "parallel",
+                  "steps": [
+                    {
+                      "kind": "SecretGroup",
+                      "spec": {
+                        "type": "secret",
+                        "secretType": "environment-arguments",
+                        "priority": 10,
+                        "name": "secret-values",
+                        "secrets": {
+                          "variables": {
+                            "REGISTRY_STORAGE_S3_BUCKET": "${args.BUCKET_NAME}",
+                            "REGISTRY_STORAGE_S3_ACCESSKEY": "${args.ACCESS_KEY}",
+                            "REGISTRY_STORAGE_S3_SECRETKEY": "${args.SECRET_KEY}",
+                            "REGISTRY_HTTP_SECRET": "${fn.randomSecret(32, 'hex')}"
+                          },
+                          "files": {
+                            "/tmp/anu.pem": {
+                              "data": "${args.CERT_FILE}"
+                            },
+                            "/tmp/anu.key": {
+                              "data": "${args.CERT_KEY}"
+                            }
+                          },
+                          "dockerSecretMounts": {}
+                        },
+                        "addonDependencies": [],
+                        "restrictions": {
+                          "restricted": false,
+                          "nfObjects": [],
+                          "tags": []
+                        }
+                      },
+                      "ref": "secret-values"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "name": "registry",
+  "description": "Template generated for 'registry' project.",
+  "options": {
+    "autorun": false,
+    "concurrencyPolicy": "allow",
+    "runOnUpdate": false
+  },
+  "argumentOverrides": {
+    "BUCKET_NAME": "<bucket_name>",
+    "ACCESS_KEY": "<access_key>",
+    "SECRET_KEY": "<secret_key>",
+    "CERT_FILE": "<cert_generated>",
+    "CERT_KEY": "<cert_key_generated"
+  }
+}
